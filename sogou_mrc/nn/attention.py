@@ -5,6 +5,7 @@ from sogou_mrc.nn.layers import Layer
 
 VERY_NEGATIVE_NUMBER = -1e29
 
+
 class BiAttention(Layer):
     """ Bi-Directonal Attention from https://arxiv.org/abs/1611.01603 """
 
@@ -59,13 +60,12 @@ class SelfAttention(Layer):
         sim_mat = self.similarity_function(query, query)
         sim_mat += tf.expand_dims(tf.eye(tf.shape(query)[1]) * VERY_NEGATIVE_NUMBER, 0)
         mask = tf.expand_dims(tf.sequence_mask(query_len, tf.shape(query)[1], dtype=tf.float32), axis=1)
-        sim_mat = sim_mat + (1. - mask) * VERY_NEGATIVE_NUMBER 
+        sim_mat = sim_mat + (1. - mask) * VERY_NEGATIVE_NUMBER
         bias = tf.exp(tf.get_variable("no-alignment-bias", initializer=tf.constant(-1.0, dtype=tf.float32)))
         sim_mat = tf.exp(sim_mat)
         sim_prob = sim_mat / (tf.reduce_sum(sim_mat, axis=2, keep_dims=True) + bias)
 
         return tf.matmul(sim_prob, query)
-
 
 
 class SelfAttn(Layer):

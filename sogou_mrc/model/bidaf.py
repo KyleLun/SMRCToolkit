@@ -5,7 +5,7 @@ import numpy as np
 import logging
 from collections import OrderedDict, defaultdict
 from sogou_mrc.model.base_model import BaseModel
-from sogou_mrc.nn.layers import Conv1DAndMaxPooling, Dropout, Highway, Embedding,ElmoEmbedding
+from sogou_mrc.nn.layers import Conv1DAndMaxPooling, Dropout, Highway, Embedding, ElmoEmbedding
 from sogou_mrc.nn.recurrent import CudnnBiLSTM
 from sogou_mrc.nn.attention import BiAttention
 from sogou_mrc.nn.similarity_function import TriLinear
@@ -16,7 +16,8 @@ class BiDAF(BaseModel):
     def __init__(self, vocab, pretrained_word_embedding=None, word_embedding_size=100, char_embedding_size=8,
                  char_conv_filters=100,
                  char_conv_kernel_size=5, rnn_hidden_size=100,
-                 dropout_keep_prob=0.8, max_answer_len=17, word_embedding_trainable=False,use_elmo=False,elmo_local_path=None,
+                 dropout_keep_prob=0.8, max_answer_len=17, word_embedding_trainable=False, use_elmo=False,
+                 elmo_local_path=None,
                  enable_na_answer=False):
         super(BiDAF, self).__init__(vocab)
         self.rnn_hidden_size = rnn_hidden_size
@@ -28,9 +29,9 @@ class BiDAF(BaseModel):
         self.char_conv_kernel_size = char_conv_kernel_size
         self.max_answer_len = max_answer_len
         self.use_elmo = use_elmo
-        self.elmo_local_path= elmo_local_path
+        self.elmo_local_path = elmo_local_path
         self.word_embedding_trainable = word_embedding_trainable
-        self.enable_na_answer = enable_na_answer # for squad2.0
+        self.enable_na_answer = enable_na_answer  # for squad2.0
         self._build_graph()
 
     def _build_graph(self):
@@ -45,7 +46,7 @@ class BiDAF(BaseModel):
         self.training = tf.placeholder(tf.bool, [])
 
         self.question_tokens = tf.placeholder(tf.string, [None, None])
-        self.context_tokens = tf.placeholder(tf.string,[None,None])
+        self.context_tokens = tf.placeholder(tf.string, [None, None])
         if self.enable_na_answer:
             self.na = tf.placeholder(tf.int32, [None])
         # 1. Word encoding
@@ -54,7 +55,6 @@ class BiDAF(BaseModel):
                                    trainable=self.word_embedding_trainable)
         char_embedding = Embedding(embedding_shape=(len(self.vocab.get_char_vocab()) + 1, self.char_embedding_size),
                                    trainable=True, init_scale=0.2)
-
 
         # 1.1 Embedding
         context_word_repr = word_embedding(self.context_word)
@@ -68,19 +68,19 @@ class BiDAF(BaseModel):
         context_char_repr = dropout(conv1d(context_char_repr), self.training)
         question_char_repr = dropout(conv1d(question_char_repr), self.training)
 
-        #elmo embedding
+        # elmo embedding
         if self.use_elmo:
             elmo_emb = ElmoEmbedding(local_path=self.elmo_local_path)
-            context_elmo_repr = elmo_emb(self.context_tokens,self.context_len)
-            context_elmo_repr = dropout(context_elmo_repr,self.training)
-            question_elmo_repr = elmo_emb(self.question_tokens,self.question_len)
-            question_elmo_repr = dropout(question_elmo_repr,self.training)
-        #concat word and char
-        context_repr = tf.concat([context_word_repr, context_char_repr],axis=-1)
-        question_repr = tf.concat([question_word_repr,question_char_repr],axis=-1)
+            context_elmo_repr = elmo_emb(self.context_tokens, self.context_len)
+            context_elmo_repr = dropout(context_elmo_repr, self.training)
+            question_elmo_repr = elmo_emb(self.question_tokens, self.question_len)
+            question_elmo_repr = dropout(question_elmo_repr, self.training)
+        # concat word and char
+        context_repr = tf.concat([context_word_repr, context_char_repr], axis=-1)
+        question_repr = tf.concat([question_word_repr, question_char_repr], axis=-1)
         if self.use_elmo:
-            context_repr= tf.concat([context_repr,context_elmo_repr],axis=-1)
-            question_repr = tf.concat([question_repr,question_elmo_repr],axis=-1)
+            context_repr = tf.concat([context_repr, context_elmo_repr], axis=-1)
+            question_repr = tf.concat([question_repr, question_elmo_repr], axis=-1)
 
         # 1.3 Highway network
         highway1 = Highway()
@@ -134,24 +134,24 @@ class BiDAF(BaseModel):
             concat_start_na_prob = masked_softmax(self.concat_start_na_logits, self.context_len + 1)
             self.na_prob = tf.squeeze(tf.slice(concat_start_na_prob, [0, 0], [-1, 1]), axis=1)
             self.start_prob = tf.slice(concat_start_na_prob, [0, 1], [-1, -1])
-            self.concat_end_na_logits = tf.concat([self.na_bias_tiled,end_logits],axis=-1)
-            concat_end_na_prob = masked_softmax(self.concat_end_na_logits,self.context_len+1)
-            self.na_prob2 =tf.squeeze(tf.slice(concat_end_na_prob,[0,0],[-1,1]),axis=1)
-            self.end_prob = tf.slice(concat_end_na_prob,[0,1],[-1,-1])
-            max_len =tf.reduce_max(self.context_len)
-            start_label = tf.cast(tf.one_hot(self.answer_start,max_len),tf.float32)
-            start_label =(1.0-tf.cast(tf.expand_dims(self.na,axis=-1),tf.float32))*start_label
-            na = tf.cast(tf.expand_dims(self.na,axis=-1),tf.float32)
-            start_na_label = tf.concat([na,start_label],axis=-1)
+            self.concat_end_na_logits = tf.concat([self.na_bias_tiled, end_logits], axis=-1)
+            concat_end_na_prob = masked_softmax(self.concat_end_na_logits, self.context_len + 1)
+            self.na_prob2 = tf.squeeze(tf.slice(concat_end_na_prob, [0, 0], [-1, 1]), axis=1)
+            self.end_prob = tf.slice(concat_end_na_prob, [0, 1], [-1, -1])
+            max_len = tf.reduce_max(self.context_len)
+            start_label = tf.cast(tf.one_hot(self.answer_start, max_len), tf.float32)
+            start_label = (1.0 - tf.cast(tf.expand_dims(self.na, axis=-1), tf.float32)) * start_label
+            na = tf.cast(tf.expand_dims(self.na, axis=-1), tf.float32)
+            start_na_label = tf.concat([na, start_label], axis=-1)
             self.start_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
-                    logits=mask_logits(self.concat_start_na_logits,self.context_len+1),
-                    labels=start_na_label))
-            end_label = tf.cast(tf.one_hot(self.answer_end,max_len),tf.float32)
-            end_label = (1.0-tf.cast(tf.expand_dims(self.na,axis=-1),tf.float32))*end_label
-            end_na_label = tf.concat([na,end_label],axis=-1)
+                logits=mask_logits(self.concat_start_na_logits, self.context_len + 1),
+                labels=start_na_label))
+            end_label = tf.cast(tf.one_hot(self.answer_end, max_len), tf.float32)
+            end_label = (1.0 - tf.cast(tf.expand_dims(self.na, axis=-1), tf.float32)) * end_label
+            end_na_label = tf.concat([na, end_label], axis=-1)
             self.end_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
-                    logits=mask_logits(self.concat_end_na_logits,self.context_len+1),
-                    labels=end_na_label))
+                logits=mask_logits(self.concat_end_na_logits, self.context_len + 1),
+                labels=end_na_label))
         else:
 
             self.start_loss = tf.reduce_mean(
@@ -185,7 +185,7 @@ class BiDAF(BaseModel):
             "end_prob": self.end_prob
         }
         if self.enable_na_answer:
-            output_dict['na_prob'] = self.na_prob*self.na_prob2
+            output_dict['na_prob'] = self.na_prob * self.na_prob2
 
         self.output_variable_dict = OrderedDict(output_dict)
 
@@ -237,5 +237,4 @@ class BiDAF(BaseModel):
                 preds_dict[instance['qid']] = pred_answer if max_prob > output['na_prob'][i] else ''
                 na_prob[instance['qid']] = output['na_prob'][i]
 
-        return preds_dict if not self.enable_na_answer else (preds_dict,na_prob)
-
+        return preds_dict if not self.enable_na_answer else (preds_dict, na_prob)

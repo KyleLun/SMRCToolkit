@@ -76,8 +76,7 @@ class Trainer(object):
         for epoch in range(epochs):
             logging.info("Epoch {}/{}".format(epoch + 1, epochs))
             train_batch_generator.init()
-            train_num_steps = (
-                                      train_batch_generator.get_instance_size() + train_batch_generator.get_batch_size() - 1) // train_batch_generator.get_batch_size()
+            train_num_steps = (train_batch_generator.get_instance_size() + train_batch_generator.get_batch_size() - 1) // train_batch_generator.get_batch_size()
             model.session.run(model.train_metric_init_op)
 
             # one epoch consists of several eposides

@@ -329,16 +329,18 @@ class BertEmbedding(Layer):
         self.bert_config = modeling.BertConfig.from_json_file(CONFIG_FILE)
         self.init_checkpoint = os.path.join(BERT_PRETRAINED_DIR, 'bert_model.ckpt')
 
-    def __call__(self, input_ids, input_mask, segment_ids, is_training,use_one_hot_embeddings=True,return_pool_output=False):
+    def __call__(self, input_ids, input_mask, segment_ids, is_training, use_one_hot_embeddings=True,
+                 return_pool_output=False):
         """Creates a classification model."""
         self.model = modeling.BertModel(
-                config=self.bert_config,
-                is_training=is_training,
-                input_ids=input_ids,
-                input_mask=input_mask,
-                token_type_ids=segment_ids,
-                use_one_hot_embeddings=use_one_hot_embeddings)
-        return self.model.get_sequence_output() if not return_pool_output else  (self.model.get_sequence_output(),self.model.get_pooled_output())
+            config=self.bert_config,
+            is_training=is_training,
+            input_ids=input_ids,
+            input_mask=input_mask,
+            token_type_ids=segment_ids,
+            use_one_hot_embeddings=use_one_hot_embeddings)
+        return self.model.get_sequence_output() if not return_pool_output else (
+        self.model.get_sequence_output(), self.model.get_pooled_output())
 
     def init_bert(self):
         tvars = tf.trainable_variables()
